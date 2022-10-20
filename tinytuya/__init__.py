@@ -171,7 +171,7 @@ class HAInterface:
     def isalive(self):
         return self.isstillalive
         
-    def close(self):
+    async def close(self):
         self.device.device.close()
         self.isstillalive = False
 
@@ -184,18 +184,27 @@ class HAInterface:
     async def set_dp(self, state, dp_index):
         await self.device.device.set_status(state, dp_index)
 
+    async def detect_available_dps(self):
+        while(not self.device.started):
+            await asyncio.sleep(1)
+   
+        return self.dps_cache
     def connect(self):
         self.device.device.set_version(self.protocol_version)
 
     async def status(self):
         status = {}
+        while(not self.device.started):
+            await asyncio.sleep(1) 
+
         if(self.device.started):
             status = await self.device.device.status()
+
         return status
 
 
 class DeviceWrapper:
-
+    dps_cache = {}
     heartbeatssend = 0
     heartbeatsreceived = 0
     device = 0
@@ -213,7 +222,9 @@ async def heartbeat(device, haobj):
     await device.device.start_socket()
     while(haobj.isalive()):
         if(device.device.get_version() == 3.4):
+            log.error("[" + devid + "] updatedps")
             await device.device.updatedps()
+            await asyncio.sleep(2)
             device.started = True
         else:
             await device.device.heartbeat(nowait=True)
@@ -227,7 +238,8 @@ async def heartbeat(device, haobj):
         log.debug("[" + devid + "] " + str(device.heartbeatssend) + " heartbeats send, " + str(device.heartbeatsreceived) + " heartbeats received")        
         if(device.heartbeatsreceived < device.heartbeatssend and device.device.get_version() != 3.4):
             device.device.close()
-            device.listener.disconnected()
+            if(device.listener != None):
+                device.listener.disconnected()
 
 
 
@@ -247,12 +259,17 @@ async def main(device, haobj):
                 if (data.cmd == 9):
                     log.debug("[" + devid + "] Received Heartbeat response") 
                     device.heartbeatsreceived = device.heartbeatsreceived + 1
-                    device.listener.status_updated({})
+                    if(device.listener != None):
+                        device.listener.status_updated({})
                     
                 if (data.cmd == 7):
                     log.debug("[" + devid + "] Received SET_DP response")                 
             else:
-                device.listener.status_updated(data)
+                if("dps" in data):
+                    haobj.dps_cache.update(data["dps"])
+
+                if(device.listener != None):
+                    device.listener.status_updated(data)
 
 
 async def connect(
@@ -275,7 +292,7 @@ async def connect(
     task1 = asyncio.create_task(main(dev, haobj))
     task2 = asyncio.create_task(heartbeat(dev, haobj))
         
-    
+
     return haobj
 
 

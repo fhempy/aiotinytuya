@@ -1182,6 +1182,7 @@ class XenonDevice(object):
         self.sendWait = s
 
     def close(self):
+        self._check_socket_close(True)
         self.__del__()
 
     @staticmethod
