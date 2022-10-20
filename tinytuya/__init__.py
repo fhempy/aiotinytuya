@@ -172,23 +172,25 @@ class HAInterface:
         return self.isstillalive
         
     def close(self):
-        self.device.close()
+        self.device.device.close()
         self.isstillalive = False
 
     async def update_dps(self, dp_index=1):
-        await self.device.updatedps(state, dp_index)
+        await self.device.device.updatedps(state, dp_index)
 
     def add_dps_to_request(self, index):
         pass
 
     async def set_dp(self, state, dp_index):
-        await self.device.set_status(state, dp_index)
+        await self.device.device.set_status(state, dp_index)
 
     def connect(self):
-        self.device.set_version(self.protocol_version)
+        self.device.device.set_version(self.protocol_version)
 
     async def status(self):
-        status = await self.device.status()
+        status = {}
+        if(self.device.started):
+            status = await self.device.device.status()
         return status
 
 
@@ -198,10 +200,11 @@ class DeviceWrapper:
     heartbeatsreceived = 0
     device = 0
     listener = 0
-
+    started = False
     def __init__(self, device, listener):
         self.device = device
         self.listener = listener
+        self.started = False
 
 async def heartbeat(device, haobj):
     devid = device.device.get_deviceid()
@@ -211,9 +214,10 @@ async def heartbeat(device, haobj):
     while(haobj.isalive()):
         if(device.device.get_version() == 3.4):
             await device.device.updatedps()
-            #await device.device.heartbeat(nowait=True)
+            device.started = True
         else:
             await device.device.heartbeat(nowait=True)
+            device.started = True
         device.heartbeatssend  = device.heartbeatssend + 1
         if(device.device.get_version() == 3.4):
             await asyncio.sleep(5)
@@ -264,9 +268,9 @@ async def connect(
     on_connected = loop.create_future()
     device = OutletDevice(device_id, address, local_key, version=protocol_version)
     device.set_socketPersistent(True)
-    haobj = HAInterface(device, protocol_version)
     
     dev = DeviceWrapper(device, listener)
+    haobj = HAInterface(dev, protocol_version)
     
     task1 = asyncio.create_task(main(dev, haobj))
     task2 = asyncio.create_task(heartbeat(dev, haobj))
