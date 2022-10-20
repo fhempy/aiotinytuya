@@ -222,7 +222,6 @@ async def heartbeat(device, haobj):
     await device.device.start_socket()
     while(haobj.isalive()):
         if(device.device.get_version() == 3.4):
-            log.error("[" + devid + "] updatedps")
             await device.device.updatedps()
             await asyncio.sleep(2)
             device.started = True
