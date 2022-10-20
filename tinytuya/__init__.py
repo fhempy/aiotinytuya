@@ -178,6 +178,8 @@ class HAInterface:
     async def update_dps(self, dp_index=1):
         await self.device.updatedps(state, dp_index)
 
+    def add_dps_to_request(self, index):
+        pass
 
     async def set_dp(self, state, dp_index):
         await self.device.set_status(state, dp_index)
