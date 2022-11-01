@@ -19,6 +19,7 @@
     set_socketPersistent(False/True)   # False [default] or True
     set_socketNODELAY(False/True)      # False or True [default]
     set_socketRetryLimit(integer)      # retry count limit [default 5]
+    set_socketRetryDelay(integer)      # retry delay [default 5]
     set_socketTimeout(timeout)         # set connection timeout in seconds [default 5]
     set_dpsUsed(dps_to_request)        # add data points (DPS) to request
     add_dps_to_request(index)          # add data point (DPS) index set to None
@@ -83,13 +84,13 @@ except ImportError:
 # Colorama terminal color capability for all platforms
 init()
 
-version_tuple = (1, 7, 1)
+version_tuple = (1, 7, 2)
 version = __version__ = "%d.%d.%d" % version_tuple
 __author__ = "jasonacox"
 
 log = logging.getLogger(__name__)
 # Uncomment the following to set debug mode or call set_debug()
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 log.debug("%s version %s", __name__, __version__)
 log.debug("Python %s on %s", sys.version, sys.platform)
@@ -587,6 +588,7 @@ class XenonDevice(object):
         self.socketPersistent = False if not persist else True
         self.socketNODELAY = True
         self.socketRetryLimit = 5
+        self.socketRetryDelay = 5
         self.dps_to_request = {}
         self.seqno = 1
         self.sendWait = 0.01
@@ -648,10 +650,13 @@ class XenonDevice(object):
         
     def __del__(self):
         # In case we have a lingering socket connection, close it
-        if self.socket is not None:
-            # self.socket.shutdown(socket.SHUT_RDWR)
-            self.socket.close()
-            self.socket = None
+        try:
+            if self.socket:
+                # self.socket.shutdown(socket.SHUT_RDWR)
+                self.socket.close()
+                self.socket = None
+        except:
+            pass
 
     def __repr__(self):
         # FIXME can do better than this
@@ -659,7 +664,7 @@ class XenonDevice(object):
                 (self.__class__.__name__, self.id, self.address, self.real_local_key.decode(), self.dev_type, self.connection_timeout, self.version, self.socketPersistent))
 
     async def _get_socket(self, renew):
-        # TODO add original retry mechanism from localtuya
+        # TODO add original retry mechanism from localtuya wit socketRetryDelay
         if renew and self.writer is not None:
             # self.socket.shutdown(socket.SHUT_RDWR)
             self.writer.close()
@@ -693,6 +698,7 @@ class XenonDevice(object):
         while length > 0:
             newdata = await self.reader.read(length)
             if not newdata or len(newdata) == 0:
+                log.debug("_recv_all(): no data? %r", newdata)
                 # connection closed?
                 if(self.reader.at_eof() == True):
                     raise DecodeError("[" + self.id + "] No data received - end of file!")    
@@ -734,6 +740,7 @@ class XenonDevice(object):
         if remaining > 0:
             data += await self._recv_all(remaining)
 
+        log.debug("received data=%r", binascii.hexlify(data))
         hmac_key = self.local_key if self.version == 3.4 else None
         return unpack_message(data, header=header, hmac_key=hmac_key)
 
@@ -758,9 +765,9 @@ class XenonDevice(object):
                 return msg
             recv_retries -= 1
             if recv_retries == 0:
-                log.debug("[" + self.id + "] received null payload (%r) but out of recv retries, giving up", msg)
+                log.debug("received null payload (%r) but out of recv retries, giving up", msg)
             else:
-                log.debug("[" + self.id + "] received null payload (%r), fetch new one - %s retries remaining", msg, recv_retries)
+                log.debug("received null payload (%r), fetch new one - %s retries remaining", msg, recv_retries)
         return None
 
     async def _send_receive(self, payload, minresponse=28, getresponse=True, decode_response=True):
@@ -790,7 +797,7 @@ class XenonDevice(object):
             # send request to device
             try:
                 if payload is not None and do_send:
-                    log.debug("[" + self.id + "] sending payload: " + str(payload))
+                    log.debug("sending payload")
                     enc_payload = self._encode_message(payload) if type(payload) == MessagePayload else payload
                     self.writer.write(enc_payload)
                     time.sleep(self.sendWait)  # give device time to respond
@@ -802,15 +809,21 @@ class XenonDevice(object):
                     if rmsg:
                         payload = None
                         partial_success = True
-                        msg = rmsg          
-                    success = True
-                    # TODO Add retry mechanism
+                        msg = rmsg
+                    if (not msg or len(msg.payload) == 0) and recv_retries <= max_recv_retries:
+                        log.debug("received null payload (%r), fetch new one - retry %s / %s", msg, recv_retries, max_recv_retries)
+                        recv_retries += 1
+                        if recv_retries > max_recv_retries:
+                            success = True
+                    else:
+                        success = True
+                        log.debug("received message=%r", msg)
                 if not getresponse:
                     # legacy/default mode avoids persisting socket across commands
                     self._check_socket_close()
                     return None
             except (KeyboardInterrupt, SystemExit) as err:
-                log.debug("[" + self.id + "] Keyboard Interrupt - Exiting")
+                log.debug("Keyboard Interrupt - Exiting")
                 raise
             except socket.timeout as err:
                 # a socket timeout occurred
@@ -822,28 +835,27 @@ class XenonDevice(object):
                 retries += 1
                 self._check_socket_close(True)
                 log.debug(
-                    "[" + self.id + "] Timeout in _send_receive() - retry %s / %s",
+                    "Timeout in _send_receive() - retry %s / %s",
                     retries, self.socketRetryLimit
                 )
                 # if we exceed the limit of retries then lets get out of here
                 if retries > self.socketRetryLimit:
                     log.debug(
-                        "[" + self.id + "] Exceeded tinytuya retry limit (%s)",
+                        "Exceeded tinytuya retry limit (%s)",
                         self.socketRetryLimit
                     )
                     # timeout reached - return error
                     json_payload = error_json(
-                        ERR_TIMEOUT, "[" + self.id + "] Check device key or version"
+                        ERR_TIMEOUT, "Check device key or version"
                     )
                     return json_payload
                 # retry:  wait a bit, toss old socket and get new one
                 time.sleep(0.1)
                 await self._get_socket(True)
             except DecodeError as err:
-                log.debug("[" + self.id + "] Error decoding received data - read retry %s/%s", recv_retries, max_recv_retries, exc_info=True)
+                log.debug("Error decoding received data - read retry %s/%s", recv_retries, max_recv_retries, exc_info=True)
                 recv_retries += 1
-                #TODO add retry mechanism
-                if (1==1 or recv_retries > max_recv_retries):
+                if recv_retries > max_recv_retries:
                     # we recieved at least 1 valid message with a null payload, so the send was successful
                     if partial_success:
                         self._check_socket_close()
@@ -857,16 +869,16 @@ class XenonDevice(object):
                 retries += 1
                 self._check_socket_close(True)
                 log.debug(
-                    "[" + self.id + str(err) + "] Network connection error in _send_receive() - retry %s/%s",
+                    "Network connection error in _send_receive() - retry %s/%s",
                     retries, self.socketRetryLimit, exc_info=True
                 )
                 # if we exceed the limit of retries then lets get out of here
                 if retries > self.socketRetryLimit:
                     log.debug(
-                        "[" + self.id + "] Exceeded tinytuya retry limit (%s)",
+                        "Exceeded tinytuya retry limit (%s)",
                         self.socketRetryLimit
                     )
-                    log.debug("[" + self.id + "] Unable to connect to device ")
+                    log.debug("Unable to connect to device ")
                     # timeout reached - return error
                     json_payload = error_json(ERR_CONNECT)
                     return json_payload
@@ -884,11 +896,9 @@ class XenonDevice(object):
             return msg
 
         # null packet, nothing to decode
-        if not msg:
+        if not msg or len(msg.payload) == 0:
+            log.debug("raw unpacked message = %r", msg)
             return None
-            
-        if(len(msg.payload) == 0):
-            return msg        
         # option - decode Message with hard coded offsets
         # result = self._decode_payload(data[20:-8])
 
@@ -896,6 +906,7 @@ class XenonDevice(object):
         # and return payload decrypted
         try:
             # Data available: seqno cmd retcode payload crc
+            log.debug("raw unpacked message = %r", msg)
             result = self._decode_payload(msg.payload)
 
             if result is None:
@@ -921,12 +932,14 @@ class XenonDevice(object):
         if self.version == 3.4:
             # 3.4 devices encrypt the version header in addition to the payload
             try:
-                log.debug("[" + self.id + "] decrypting=%r", payload)
+                log.debug("decrypting=%r", payload)
                 payload = cipher.decrypt(payload, False, decode_text=False)
             except:
                 log.debug("incomplete payload=%r (len:%d)", payload, len(payload), exc_info=True)
                 return error_json(ERR_PAYLOAD)
 
+            log.debug("decrypted 3.x payload=%r", payload)
+            log.debug("payload type = %s", type(payload))
 
         if payload.startswith(PROTOCOL_VERSION_BYTES_31):
             # Received an encrypted payload
@@ -939,17 +952,22 @@ class XenonDevice(object):
             # Trim header for non-default device type
             if payload.startswith( self.version_bytes ):
                 payload = payload[len(self.version_header) :]
+                log.debug("removing 3.x=%r", payload)
             elif self.dev_type == "device22" and (len(payload) & 0x0F) != 0:
                 payload = payload[len(self.version_header) :]
+                log.debug("removing device22 3.x header=%r", payload)
 
             if self.version != 3.4:
                 try:
+                    log.debug("decrypting=%r", payload)
                     payload = cipher.decrypt(payload, False)
                 except:
-                    log.debug("[" + self.id + "] incomplete payload=%r (len:%d)", payload, len(payload), exc_info=True)
+                    log.debug("incomplete payload=%r (len:%d)", payload, len(payload), exc_info=True)
                     return error_json(ERR_PAYLOAD)
 
-
+                log.debug("decrypted 3.x payload=%r", payload)
+                # Try to detect if device22 found
+                log.debug("payload type = %s", type(payload))
 
             if not isinstance(payload, str):
                 try:
@@ -967,11 +985,12 @@ class XenonDevice(object):
                 )
                 return None
         elif not payload.startswith(b"{"):
-            log.debug("[" + self.id + "] Unexpected payload=%r", payload)
+            log.debug("Unexpected payload=%r", payload)
             return error_json(ERR_PAYLOAD, payload)
 
         if not isinstance(payload, str):
             payload = payload.decode()
+        log.debug("decoded results=%r", payload)
         try:
             json_payload = json.loads(payload)
         except:
@@ -991,36 +1010,36 @@ class XenonDevice(object):
         rkey = await self._send_receive_quick( MessagePayload(SESS_KEY_NEG_START, self.local_nonce), 2 )
         if not rkey or type(rkey) != TuyaMessage or len(rkey.payload) < 48:
             # error
-            log.debug("[" + self.id + "] session key negotiation failed on step 1")
+            log.debug("session key negotiation failed on step 1")
             return False
 
         if rkey.cmd != SESS_KEY_NEG_RESP:
-            log.debug("[" + self.id + "] session key negotiation step 2 returned wrong command: %d", rkey.cmd)
+            log.debug("session key negotiation step 2 returned wrong command: %d", rkey.cmd)
             return False
 
         payload = rkey.payload
         try:
-            log.debug("[" + self.id + "] decrypting=%r", payload)
+            log.debug("decrypting=%r", payload)
             cipher = AESCipher(self.real_local_key)
             payload = cipher.decrypt(payload, False, decode_text=False)
         except:
-            log.debug("[" + self.id + "] session key step 2 decrypt failed, payload=%r (len:%d)", payload, len(payload), exc_info=True)
+            log.debug("session key step 2 decrypt failed, payload=%r (len:%d)", payload, len(payload), exc_info=True)
             return False
 
-        log.debug("[" + self.id + "] decrypted session key negotiation step 2 payload=%r", payload)
-        log.debug("[" + self.id + "] payload type = %s len = %d", type(payload), len(payload))
+        log.debug("decrypted session key negotiation step 2 payload=%r", payload)
+        log.debug("payload type = %s len = %d", type(payload), len(payload))
 
         if len(payload) < 48:
-            log.debug("[" + self.id + "] session key negotiation step 2 failed, too short response")
+            log.debug("session key negotiation step 2 failed, too short response")
             return False
 
         self.remote_nonce = payload[:16]
         hmac_check = hmac.new(self.local_key, self.local_nonce, sha256).digest()
 
         if hmac_check != payload[16:48]:
-            log.debug("[" + self.id + "] session key negotiation step 2 failed HMAC check! wanted=%r but got=%r", binascii.hexlify(hmac_check), binascii.hexlify(payload[16:48]))
+            log.debug("session key negotiation step 2 failed HMAC check! wanted=%r but got=%r", binascii.hexlify(hmac_check), binascii.hexlify(payload[16:48]))
 
-        log.debug("[" + self.id + "] session local nonce: %r remote nonce: %r", self.local_nonce, self.remote_nonce)
+        log.debug("session local nonce: %r remote nonce: %r", self.local_nonce, self.remote_nonce)
 
         rkey_hmac = hmac.new(self.local_key, self.remote_nonce, sha256).digest()
         await self._send_receive_quick( MessagePayload(SESS_KEY_NEG_FINISH, rkey_hmac), None )
@@ -1030,11 +1049,11 @@ class XenonDevice(object):
             self.local_key = ''.join(k)
         else:
             self.local_key = bytes( [ a^b for (a,b) in zip(self.local_nonce,self.remote_nonce) ] )
-        log.debug("[" + self.id + "] Session nonce XOR'd: %r" % self.local_key)
+        log.debug("Session nonce XOR'd: %r" % self.local_key)
 
         cipher = AESCipher(self.real_local_key)
         self.local_key = cipher.encrypt(self.local_key, False, pad=False)
-        log.debug("[" + self.id + "] Session key negotiate success! session key: %r", self.local_key)
+        log.debug("Session key negotiate success! session key: %r", self.local_key)
         return True
 
     # adds protocol header (if needed) and encrypts
@@ -1047,6 +1066,7 @@ class XenonDevice(object):
             if msg.cmd not in NO_PROTOCOL_HEADER_CMDS:
                 # add the 3.x header
                 payload = self.version_header + payload
+            log.debug('final payload: %r', payload)
             payload = self.cipher.encrypt(payload, False)
         elif self.version >= 3.2:
             # expect to connect and then disconnect to set new
@@ -1079,6 +1099,7 @@ class XenonDevice(object):
         msg = TuyaMessage(self.seqno, msg.cmd, 0, payload, 0, True)
         self.seqno += 1  # increase message sequence number
         buffer = pack_message(msg,hmac_key=hmac_key)
+        log.debug("payload encrypted=%r",binascii.hexlify(buffer))
         return buffer
 
     def receive(self):
@@ -1167,6 +1188,9 @@ class XenonDevice(object):
 
     def set_socketRetryLimit(self, limit):
         self.socketRetryLimit = limit
+
+    def set_socketRetryDelay(self, delay):
+        self.socketRetryDelay = delay
 
     def set_socketTimeout(self, s):
         self.connection_timeout = s
@@ -1274,6 +1298,7 @@ class XenonDevice(object):
         # if spaces are not removed device does not respond!
         payload = payload.replace(" ", "")
         payload = payload.encode("utf-8")
+        log.debug("building command %s payload=%r", command, payload)
 
         # create Tuya message packet
         return MessagePayload(command_override, payload)
@@ -1335,6 +1360,7 @@ class Device(XenonDevice):
         payload = self.generate_payload(CONTROL, {switch: on})
 
         data = await self._send_receive(payload, getresponse=False)
+        log.debug("set_status received data=%r", data)
 
         return data
 
@@ -1359,6 +1385,7 @@ class Device(XenonDevice):
         # open device, send request, then close connection
         payload = self.generate_payload(HEART_BEAT)
         data = await self._send_receive(payload, 0, getresponse=False)
+        log.debug("heartbeat received data=%r", data)
         return data
 
     async def updatedps(self, index=None, nowait=True):
