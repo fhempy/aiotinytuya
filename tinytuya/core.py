@@ -732,7 +732,7 @@ class XenonDevice(object):
             else:
                 data = data[prefix_offset:]
 
-            data += self._recv_all(header_len+ret_end_len-len(data))
+            data += await self._recv_all(header_len+ret_end_len-len(data))
             prefix_offset = data.find(PREFIX_BIN)
 
         header = parse_header(data)
@@ -800,7 +800,7 @@ class XenonDevice(object):
                     log.debug("sending payload")
                     enc_payload = self._encode_message(payload) if type(payload) == MessagePayload else payload
                     self.writer.write(enc_payload)
-                    time.sleep(self.sendWait)  # give device time to respond
+                    await asyncio.sleep(self.sendWait)  # give device time to respond
                 if getresponse:
                     do_send = False
                     rmsg = await self._receive()
