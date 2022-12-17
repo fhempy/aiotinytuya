@@ -234,21 +234,22 @@ async def heartbeat(device, haobj):
         else:
             await asyncio.sleep(10)
 
-        log.debug("[" + devid + "] " + str(device.heartbeatssend) + " heartbeats send, " + str(device.heartbeatsreceived) + " heartbeats received")        
-        if(device.heartbeatsreceived < device.heartbeatssend and device.device.get_version() != 3.4):
-            device.device.close()
-            if(device.listener != None):
-                device.listener.disconnected()
-
-
 
 async def main(device, haobj):
     devid = device.device.get_deviceid()
     log.debug("[" + devid + "] start main thread")
+   
     await device.device.start_socket()
     await device.device.status_quick()
+    
     while(haobj.isalive()):
-        data = await device.device.getdata()
+        try:
+            data = await device.device.getdata()
+        except Exception:
+            if device.listener != None:
+                device.listener.disconnected()
+            await haobj.close()
+            
         if(data != None):
             log.debug("[" + devid + "] Got data: " + str(data))
             if("Error" in data):
