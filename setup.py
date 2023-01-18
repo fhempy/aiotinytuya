@@ -1,13 +1,11 @@
 import setuptools
 
-from tinytuya import __version__
-
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="tinytuya",
-    version=__version__,
+    version="1.7.3",
     author="Jason Cox",
     author_email="jason@jasonacox.com",
     description="Python module to interface with Tuya WiFi smart devices",
