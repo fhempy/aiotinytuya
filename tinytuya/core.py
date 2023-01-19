@@ -1117,7 +1117,7 @@ class XenonDevice(object):
         """
         return self._send_receive(payload, 0, getresponse=False)
 
-    def detect_available_dps(self):
+    async def detect_available_dps(self):
         """Return which datapoints are supported by the device."""
         # device22 devices need a sort of bruteforce querying in order to detect the
         # list of available dps experience shows that the dps available are usually
@@ -1132,7 +1132,7 @@ class XenonDevice(object):
             self.dps_to_request = {"1": None}
             self.add_dps_to_request(range(*dps_range))
             try:
-                data = self.status()
+                data = await self.status()
             except Exception as ex:
                 log.exception("Failed to get status: %s", ex)
                 raise
@@ -1164,7 +1164,7 @@ class XenonDevice(object):
                 #self.version = 3.3
                 self.dev_type="device22"  
                 if self.dps_to_request == {}:
-                    self.detect_available_dps()
+                    asyncio.create_task(self.detect_available_dps())
         elif version == 3.4:
             self.dev_type = "v3.4"
         elif self.dev_type == "v3.4":
