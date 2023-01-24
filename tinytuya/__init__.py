@@ -106,7 +106,6 @@ import threading
 
 from time import sleep
 import asyncio as aio
-loop = aio.get_event_loop()
 
 
 class ContextualLogger:
@@ -144,7 +143,9 @@ class ContextualLogger:
 
 
 class Executor:
-    def __init__(self, loop=loop, nthreads=1):
+    def __init__(self, loop=None, nthreads=1):
+        if loop is None:
+            loop = asyncio.get_event_loop()
         from concurrent.futures import ThreadPoolExecutor
         self._ex = ThreadPoolExecutor(nthreads)
         self._loop = loop
@@ -282,6 +283,7 @@ async def connect(
     timeout=2,
 ):
 
+    loop = asyncio.get_event_loop()
     on_connected = loop.create_future()
     device = OutletDevice(device_id, address, local_key, version=protocol_version)
     device.set_socketPersistent(True)
