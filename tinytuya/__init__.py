@@ -141,11 +141,9 @@ class ContextualLogger:
 
 
 
-class HAInterface:
-    dps_cache = {}
-    isstillalive = True
-    
+class HAInterface:    
     def __init__(self, device, protocol_version):
+        self.dps_cache = {}
         self.device = device
         self.protocol_version = protocol_version
         self.isstillalive = True
@@ -171,6 +169,7 @@ class HAInterface:
             await asyncio.sleep(1)
    
         return self.dps_cache
+   
     def connect(self):
         self.device.device.set_version(self.protocol_version)
 
@@ -186,13 +185,11 @@ class HAInterface:
 
 
 class DeviceWrapper:
-    dps_cache = {}
     heartbeatssend = 0
     heartbeatsreceived = 0
-    device = 0
-    listener = 0
-    started = False
+
     def __init__(self, device, listener):
+        self.dps_cache = {}
         self.device = device
         self.listener = listener
         self.started = False
