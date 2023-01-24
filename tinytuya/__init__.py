@@ -141,25 +141,6 @@ class ContextualLogger:
 
 
 
-
-class Executor:
-    def __init__(self, loop=None, nthreads=1):
-        if loop is None:
-            loop = asyncio.get_event_loop()
-        from concurrent.futures import ThreadPoolExecutor
-        self._ex = ThreadPoolExecutor(nthreads)
-        self._loop = loop
-
-    def __call__(self, f, *args, **kw):
-        from functools import partial
-        return self._loop.run_in_executor(self._ex, partial(f, *args, **kw))
-
-
-execute = Executor()
-
-
-
-
 class HAInterface:
     dps_cache = {}
     isstillalive = True
