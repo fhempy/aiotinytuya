@@ -645,7 +645,6 @@ class XenonDevice(object):
                     await asyncio.sleep(5)
         except:
             log.debug("[" + self.id + "] ERROR OPENING SOCKET!!!" + str(self.address))
-            await asyncio.sleep(5)
             pass
         
     def __del__(self):
