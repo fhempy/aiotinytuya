@@ -21,7 +21,7 @@
     Cloud(apiRegion, apiKey, apiSecret, apiDeviceID, new_sign_algorithm)
 
   Functions
-    Device(XenonDevice) 
+    Device(XenonDevice)
         json = status()                    # returns json payload
         set_version(version)               # 3.1 [default] or 3.3
         set_socketPersistent(False/True)   # False [default] or True
@@ -89,99 +89,38 @@
 
 """
 
-from .core import *
-from .core import __version__
-from .core import __author__
+import asyncio
 
-from .OutletDevice import OutletDevice
-from .CoverDevice import CoverDevice
 from .BulbDevice import BulbDevice
 from .Cloud import Cloud
-
-import asyncio
-import concurrent.futures
-import weakref
-import threading
-
-
-from time import sleep
-import asyncio as aio
+from .core import *
+from .core import __author__, __version__
+from .CoverDevice import CoverDevice
+from .OutletDevice import OutletDevice
 
 
-class ContextualLogger:
-    """Contextual logger adding device id to log points."""
-
-    def __init__(self):
-        """Initialize a new ContextualLogger."""
-        self._logger = None
-
-    def set_logger(self, logger, device_id):
-        """Set base logger to use."""
-        self._logger = TuyaLoggingAdapter(logger, {"device_id": device_id})
-
-    def debug(self, msg, *args):
-        """Debug level log."""
-        return self._logger.log(logging.DEBUG, msg, *args)
-
-    def info(self, msg, *args):
-        """Info level log."""
-        return self._logger.log(logging.INFO, msg, *args)
-
-    def warning(self, msg, *args):
-        """Warning method log."""
-        return self._logger.log(logging.WARNING, msg, *args)
-
-    def error(self, msg, *args):
-        """Error level log."""
-        return self._logger.log(logging.ERROR, msg, *args)
-
-    def exception(self, msg, *args):
-        """Exception level log."""
-        return self._logger.exception(msg, *args)
-
-
-
-class HAInterface:    
+class HAInterface:
     def __init__(self, device, protocol_version):
         self.dps_cache = {}
         self.device = device
         self.protocol_version = protocol_version
         self.isstillalive = True
-        
+
     def isalive(self):
         return self.isstillalive
-        
+
     async def close(self):
         self.device.device.close()
         self.isstillalive = False
-
-    async def update_dps(self, dp_index=1):
-        await self.device.device.updatedps(state, dp_index)
-
-    def add_dps_to_request(self, index):
-        pass
 
     async def set_dp(self, state, dp_index):
         await self.device.device.set_status(state, dp_index)
 
     async def detect_available_dps(self):
-        while(not self.device.started):
+        while not self.device.started:
             await asyncio.sleep(1)
-   
+
         return self.dps_cache
-   
-    def connect(self):
-        self.device.device.set_version(self.protocol_version)
-
-    async def status(self):
-        status = {}
-        while(not self.device.started):
-            await asyncio.sleep(1) 
-
-        if(self.device.started):
-            status = await self.device.device.status()
-
-        return status
 
 
 class DeviceWrapper:
@@ -194,21 +133,22 @@ class DeviceWrapper:
         self.listener = listener
         self.started = False
 
+
 async def heartbeat(device, haobj):
     devid = device.device.get_deviceid()
-    await asyncio.sleep(5)        
+    await asyncio.sleep(5)
     log.debug("[" + devid + "] start heartbeat thread")
     await device.device.start_socket()
-    while(haobj.isalive()):
-        if(device.device.get_version() == 3.4):
+    while haobj.isalive():
+        if device.device.get_version() == 3.4:
             await device.device.updatedps()
             await asyncio.sleep(2)
             device.started = True
         else:
             await device.device.heartbeat(nowait=True)
             device.started = True
-        device.heartbeatssend  = device.heartbeatssend + 1
-        if(device.device.get_version() == 3.4):
+        device.heartbeatssend = device.heartbeatssend + 1
+        if device.device.get_version() == 3.4:
             await asyncio.sleep(5)
         else:
             await asyncio.sleep(10)
@@ -217,37 +157,37 @@ async def heartbeat(device, haobj):
 async def main(device, haobj):
     devid = device.device.get_deviceid()
     log.debug("[" + devid + "] start main thread")
-   
+
     await device.device.start_socket()
     await device.device.status_quick()
-    
-    while(haobj.isalive()):
+
+    while haobj.isalive():
         try:
             data = await device.device.getdata()
         except Exception:
             if device.listener != None:
                 device.listener.disconnected()
             await haobj.close()
-            
-        if(data != None):
+
+        if data != None:
             log.debug("[" + devid + "] Got data: " + str(data))
-            if("Error" in data):
-                log.debug("[" + devid + "] Received error response") 
-                                
-            elif(type(data) == TuyaMessage):
-                if (data.cmd == 9):
-                    log.debug("[" + devid + "] Received Heartbeat response") 
+            if "Error" in data:
+                log.debug("[" + devid + "] Received error response")
+
+            elif type(data) == TuyaMessage:
+                if data.cmd == 9:
+                    log.debug("[" + devid + "] Received Heartbeat response")
                     device.heartbeatsreceived = device.heartbeatsreceived + 1
-                    if(device.listener != None):
+                    if device.listener != None:
                         device.listener.status_updated({})
-                    
-                if (data.cmd == 7):
-                    log.debug("[" + devid + "] Received SET_DP response")                 
+
+                if data.cmd == 7:
+                    log.debug("[" + devid + "] Received SET_DP response")
             else:
-                if("dps" in data):
+                if "dps" in data:
                     haobj.dps_cache.update(data["dps"])
 
-                if(device.listener != None):
+                if device.listener != None:
                     device.listener.status_updated(data)
 
 
@@ -257,23 +197,15 @@ async def connect(
     local_key,
     protocol_version,
     listener=None,
-    port=6668,
-    timeout=2,
 ):
 
-    loop = asyncio.get_event_loop()
-    on_connected = loop.create_future()
     device = OutletDevice(device_id, address, local_key, version=protocol_version)
     device.set_socketPersistent(True)
-    
+
     dev = DeviceWrapper(device, listener)
     haobj = HAInterface(dev, protocol_version)
-    
+
     task1 = asyncio.create_task(main(dev, haobj))
     task2 = asyncio.create_task(heartbeat(dev, haobj))
-        
 
     return haobj
-
-
-

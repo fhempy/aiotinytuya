@@ -27,7 +27,7 @@
         (r, g, b) = colour_rgb():
         (h,s,v) = colour_hsv()
         result = state():
-        
+
     Inherited
         json = status()                    # returns json payload
         set_version(version)               # 3.1 [default] or 3.3
@@ -55,7 +55,7 @@
 
 import colorsys
 
-from .core import *
+from .core import * # pylint: disable=W0401, W0614
 
 class BulbDevice(Device):
     """
@@ -136,9 +136,9 @@ class BulbDevice(Device):
 
         # Bulb Type A
         if bulb == "A":
+            # h:0-360,s:0-255,v:0-255|hsv|
             hexvalue = ""
             for value in rgb:
-                hsvarray = [int(hsv[0] * 360), int(hsv[1] * 255), int(hsv[2] * 255)]
                 temp = str(hex(int(value))).replace("0x", "")
                 if len(temp) == 1:
                     temp = "0" + temp
@@ -215,7 +215,7 @@ class BulbDevice(Device):
 
         return (h, s, v)
 
-    def set_version(self, version):
+    def set_version(self, version): # pylint: disable=W0621
         """
         Set the Tuya device version 3.1 or 3.3 for BulbDevice
         Attempt to determine BulbDevice Type: A or B based on:
@@ -312,9 +312,8 @@ class BulbDevice(Device):
             nowait(bool): True to send without waiting for response.
         """
         if not self.has_colour:
-            return error_json(
-                ERR_FUNCTION, "set_colour: Device does not support color."
-            )
+            log.debug("set_colour: Device does not appear to support color.")
+            # return error_json(ERR_FUNCTION, "set_colour: Device does not support color.")
         if not 0 <= r <= 255:
             return error_json(
                 ERR_RANGE,
@@ -354,22 +353,21 @@ class BulbDevice(Device):
             nowait(bool): True to send without waiting for response.
         """
         if not self.has_colour:
-            return error_json(
-                ERR_FUNCTION, "set_colour: Device does not support color."
-            )
+            log.debug("set_hsv: Device does not appear to support color.")
+            # return error_json(ERR_FUNCTION, "set_hsv: Device does not support color.")
         if not 0 <= h <= 1.0:
             return error_json(
-                ERR_RANGE, "set_colour: The value for Hue needs to be between 0 and 1."
+                ERR_RANGE, "set_hsv: The value for Hue needs to be between 0 and 1."
             )
         if not 0 <= s <= 1.0:
             return error_json(
                 ERR_RANGE,
-                "set_colour: The value for Saturation needs to be between 0 and 1.",
+                "set_hsv: The value for Saturation needs to be between 0 and 1.",
             )
         if not 0 <= v <= 1.0:
             return error_json(
                 ERR_RANGE,
-                "set_colour: The value for Value needs to be between 0 and 1.",
+                "set_hsv: The value for Value needs to be between 0 and 1.",
             )
 
         (r, g, b) = colorsys.hsv_to_rgb(h, s, v)
@@ -521,9 +519,8 @@ class BulbDevice(Device):
             if state["mode"] == "white":
                 # for white mode use DPS for brightness
                 if not self.has_brightness:
-                    return error_json(
-                        ERR_FUNCTION, "set_colour: Device does not support brightness."
-                    )
+                    log.debug("set_brightness: Device does not appear to support brightness.")
+                    # return error_json(ERR_FUNCTION, "set_brightness: Device does not support brightness.")
                 payload = self.generate_payload(
                     CONTROL, {self.DPS_INDEX_BRIGHTNESS[self.bulb_type]: brightness}
                 )
@@ -572,9 +569,8 @@ class BulbDevice(Device):
             nowait(bool): True to send without waiting for response.
         """
         if not self.has_colourtemp:
-            return error_json(
-                ERR_FUNCTION, "set_colourtemp: Device does not support colortemp."
-            )
+            log.debug("set_colourtemp: Device does not appear to support colortemp.")
+            # return error_json(ERR_FUNCTION, "set_colourtemp: Device does not support colortemp.")
         if self.bulb_type == "A" and not 0 <= colourtemp <= 255:
             return error_json(
                 ERR_RANGE,

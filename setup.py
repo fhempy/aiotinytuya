@@ -4,14 +4,14 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="tinytuya",
-    version="1.7.4",
+    name="aiotinytuya",
+    version="1.11.0",
     author="Jason Cox",
     author_email="jason@jasonacox.com",
     description="Python module to interface with Tuya WiFi smart devices",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url='https://github.com/jasonacox/tinytuya',
+    url='https://github.com/fhempy/aiotinytuya',
     packages=setuptools.find_packages(exclude=("sandbox",)),
     install_requires=[
         'pycryptodome',  # Encryption - AES can also be provided via PyCrypto or pyaes
