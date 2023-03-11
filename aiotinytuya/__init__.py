@@ -201,6 +201,9 @@ async def connect(
 
     device = OutletDevice(device_id, address, local_key, version=protocol_version)
     device.set_socketPersistent(True)
+   
+    # start_socket here to generate exception on error
+    await device.start_socket()
 
     dev = DeviceWrapper(device, listener)
     haobj = HAInterface(dev, protocol_version)
