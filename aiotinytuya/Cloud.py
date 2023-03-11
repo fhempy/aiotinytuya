@@ -72,7 +72,7 @@ class Cloud(object):
             * https://iot.tuya.com/cloud/products/detail
         """
         # Class Variables
-        self.CONFIGFILE = 'tinytuya.json'
+        self.CONFIGFILE = 'aiotinytuya.json'
         self.apiRegion = apiRegion
         self.apiKey = apiKey
         self.apiSecret = apiSecret

@@ -15,7 +15,7 @@
 
 # Modules
 import sys
-import tinytuya
+import aiotinytuya
 from . import wizard
 from . import scanner
 
@@ -52,7 +52,7 @@ for i in sys.argv:
     elif i.lower() == "-yes" or i.lower() == "-y":
         assume_yes = True
     elif i.lower() == "-debug" or i.lower() == "-d":
-        tinytuya.set_debug(True)
+        aiotinytuya.set_debug(True)
     elif last_force and len(i) > 6:
         this_force = True
         force_list.append( i )
@@ -89,7 +89,7 @@ if state == 4:
 
 # State 10 = Show Usage
 if state == 10:
-    print("TinyTuya [%s]\n" % (tinytuya.version))
+    print("TinyTuya [%s]\n" % (aiotinytuya.version))
     print("Usage:\n")
     print("    python -m tinytuya <command> [<max_time>] [-debug] [-nocolor] [-force [192.168.0.0/24 192.168.1.0/24 ...]] [-h]")
     print("")
@@ -98,7 +98,7 @@ if state == 10:
     print("      devices        Scan all devices listed in devices.json file.")
     print("      snapshot       Scan devices listed in snapshot.json file.")
     print("      json           Scan devices listed in snapshot.json file [JSON].")
-    print("      <max_time>     Maximum time to find Tuya devices [Default=%s]" % tinytuya.SCANTIME)
+    print("      <max_time>     Maximum time to find Tuya devices [Default=%s]" % aiotinytuya.SCANTIME)
     print("      -nocolor       Disable color text output.")
     print("      -force         Force network scan of device IP addresses based on format:")
     print("                     [net1/mask1 net2/mask2 ...] Auto-detects if none provided.")

@@ -26,7 +26,7 @@ import errno
 import base64
 import traceback
 from colorama import init
-import tinytuya
+import aiotinytuya as tinytuya
 
 # Optional libraries required for forced scanning
 #try:

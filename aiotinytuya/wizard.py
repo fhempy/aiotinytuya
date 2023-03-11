@@ -26,7 +26,7 @@ from __future__ import print_function
 import json
 from colorama import init
 from datetime import datetime
-import tinytuya
+import aiotinytuya as tinytuya
 
 # Backward compatibility for python2
 try:
