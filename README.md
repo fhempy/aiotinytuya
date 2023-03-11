@@ -1,5 +1,2 @@
-For protocol 3.4:
-
-https://github.com/rospogrigio/localtuya/
-
-(almost there)
+AsyncIO Tinytuya implementation based on
+https://github.com/jasonacox/tinytuya
