@@ -965,7 +965,7 @@ class XenonDevice(object):
                     await self.start_socket()
                     if self.version >= 3.4:
                         # restart session key negotiation
-                        if self._negotiate_session_key():
+                        if await self._negotiate_session_key():
                             return True
                     else:
                         return True
