@@ -298,12 +298,12 @@ class ThermostatDevice(Device):
 
     def setSetpoint( self, setpoint, cf=None ):
         if self.mode == 'cool':
-            return self.setCoolSetpoint( self, setpoint, cf )
+            return self.setCoolSetpoint( setpoint, cf )
         elif self.mode == 'heat' or self.mode == 'emergencyheat':
-            return self.setHeatSetpoint( self, setpoint, cf )
+            return self.setHeatSetpoint( setpoint, cf )
         else:
             # no idea, let the thermostat figure it out
-            return self.setMiddleSetpoint( self, setpoint, cf )
+            return self.setMiddleSetpoint( setpoint, cf )
 
     def setCoolSetpoint( self, setpoint, cf=None ):
         k = 'cooling_setpoint_' + self.getCF( cf )
@@ -347,7 +347,7 @@ class ThermostatDevice(Device):
         return self.setValue( 'hold', hold )
 
     def setFanRuntime( self, rt ):
-        return self.setValue( 'fan_runtime', int(rt) )
+        return self.setValue( 'fan_run_time', int(rt) )
 
     def setValue( self, key, val ):
         dps, val = self.parseValue( key, val )
@@ -431,14 +431,12 @@ class ThermostatDevice(Device):
         return self.send(payload)
 
     def status(self):
-        data = super(ThermostatDevice, self).status()
-        return self._inspect_data( data )
+        return super(ThermostatDevice, self).status()
 
     def receive(self):
-        data = self._send_receive(None)
-        return self._inspect_data( data )
+        return self._send_receive(None)
 
-    def _inspect_data( self, data ):
+    def _process_response( self, data ):
         if not data:
             return data
 
