@@ -5,18 +5,18 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="aiotinytuya",
-    version="1.11.0",
+    version="1.12.3",
     author="Jason Cox",
     author_email="jason@jasonacox.com",
     description="Python module to interface with Tuya WiFi smart devices",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url='https://github.com/fhempy/aiotinytuya',
+    url="https://github.com/fhempy/aiotinytuya",
     packages=setuptools.find_packages(exclude=("sandbox",)),
     install_requires=[
-        'pycryptodome',  # Encryption - AES can also be provided via PyCrypto or pyaes
-        'requests',      # Used for Setup Wizard - Tuya IoT Platform calls
-        'colorama',      # Makes ANSI escape character sequences work under MS Windows.
+        "pycryptodome",  # Encryption - AES can also be provided via PyCrypto or pyaes
+        "requests",  # Used for Setup Wizard - Tuya IoT Platform calls
+        "colorama",  # Makes ANSI escape character sequences work under MS Windows.
     ],
     classifiers=[
         "Programming Language :: Python :: 2",
